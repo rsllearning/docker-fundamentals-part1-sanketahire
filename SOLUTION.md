@@ -15,8 +15,8 @@ This report documents the step-by-step practical execution, verification, and an
 | :---: | :--- | :--- | :---: | :--- |
 | **1** | **Obtain the Docker Image** | Search, pull, and verify official `nginx:latest` | **Completed** | [01_docker_images_nginx.png](screenshots/01_docker_images_nginx.png) |
 | **2** | **Run the Web Server** | Run `training-web` detached with port forwarding | **Completed** | [02_docker_ps_running.png](screenshots/02_docker_ps_running.png), [03_nginx_browser_access.png](screenshots/03_nginx_browser_access.png) |
-| **3** | **Runtime Configuration** | Inject environment variables (`APP_ENV=development`) | **In Progress** | *To be captured upon execution* |
-| **4** | **Explore Container** | Inspect logs, in-container exec, and 5 metadata fields | **Pending** | *Pending execution* |
+| **3** | **Runtime Configuration** | Inject environment variables (`APP_ENV=development`) | **Completed** | [04_env_variable_verification.png](screenshots/04_env_variable_verification.png) |
+| **4** | **Explore Container** | Inspect logs, in-container exec, and 5 metadata fields | **In Progress** | *To be captured upon execution* |
 | **5** | **Lifecycle Management** | Sequence: `Running` $\rightarrow$ `Stopped` $\rightarrow$ `Started` $\rightarrow$ `Removed` | **Pending** | *Pending execution* |
 
 ---
@@ -136,4 +136,69 @@ The terminal execution of `docker ps` verifies that `training-web` is running in
 Opening `http://localhost:8080` in the browser renders the default **"Welcome to nginx!"** landing page, proving successful end-to-end host-to-container network routing:
 
 ![Nginx Default Welcome Page in Browser](screenshots/03_nginx_browser_access.png)
+
+---
+
+## Task 3: Configure the Container Using an Environment Variable
+
+### 3.1 Objective
+Demonstrate runtime configuration decoupling by launching a separate container from the same `nginx` image, dynamically passing the environment variable `APP_ENV=development` via `-e`, and verifying its active presence inside the running container namespace.
+
+### 3.2 Theoretical Principles Applied
+* **Separation of Code and Configuration (12-Factor App):** Rather than building environment-specific Docker images (e.g., separate images for dev, test, and production), modern containerization adheres to the principle of single, immutable image artifacts. Dynamic runtime variables adjust application behavior per environment without rebuilding.
+* **Dynamic Variable Injection (`-e <KEY>=<VALUE>`):** The Docker Engine injects specified key-value pairs into the container's environment space at process spawn time.
+* **In-Container Verification (`docker exec`):** Using `docker exec` allows non-disruptive execution of diagnostic commands (`printenv` and `env`) directly within the container's process namespace.
+
+### 3.3 Executed Commands & Outputs
+
+#### Step 1: Run a second container with runtime environment variable
+```bash
+docker run -d --name training-web-env -e APP_ENV=development nginx
+```
+
+**Terminal Output:**
+```text
+24ec0747b475ea326e905073b16be4fd8289ea76787bf88af364c6b8037eb2ba
+```
+
+#### Step 2: Verify specific variable existence via in-container execution
+```bash
+docker exec training-web-env printenv APP_ENV
+```
+
+**Terminal Output:**
+```text
+development
+```
+
+#### Step 3: Inspect complete container environment
+```bash
+docker exec training-web-env env
+```
+
+**Terminal Output:**
+```text
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=24ec0747b475
+APP_ENV=development
+NGINX_VERSION=1.31.8
+NJS_VERSION=1.0.2
+NJS_RELEASE=1~trixie
+ACME_VERSION=0.4.1
+PKG_RELEASE=1~trixie
+DYNPKG_RELEASE=1~trixie
+HOME=/root
+```
+
+#### Step 4: Auxiliary container cleanup
+Once verification was completed, the secondary container was cleanly decommissioned to maintain zero resource clutter:
+```bash
+docker stop training-web-env && docker rm training-web-env
+```
+
+### 3.4 Visual Evidence Deliverable
+The terminal execution below confirms that `APP_ENV=development` was successfully passed and is actively accessible inside the container environment:
+
+![In-Container Environment Variable Verification](screenshots/04_env_variable_verification.png)
+
 
