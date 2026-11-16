@@ -14,8 +14,8 @@ This report documents the step-by-step practical execution, verification, and an
 | Task | Title | Key Objective | Status | Evidence Deliverable |
 | :---: | :--- | :--- | :---: | :--- |
 | **1** | **Obtain the Docker Image** | Search, pull, and verify official `nginx:latest` | **Completed** | [01_docker_images_nginx.png](screenshots/01_docker_images_nginx.png) |
-| **2** | **Run the Web Server** | Run `training-web` detached with port forwarding | **In Progress** | *To be captured upon execution* |
-| **3** | **Runtime Configuration** | Inject environment variables (`APP_ENV=development`) | **Pending** | *Pending execution* |
+| **2** | **Run the Web Server** | Run `training-web` detached with port forwarding | **Completed** | [02_docker_ps_running.png](screenshots/02_docker_ps_running.png), [03_nginx_browser_access.png](screenshots/03_nginx_browser_access.png) |
+| **3** | **Runtime Configuration** | Inject environment variables (`APP_ENV=development`) | **In Progress** | *To be captured upon execution* |
 | **4** | **Explore Container** | Inspect logs, in-container exec, and 5 metadata fields | **Pending** | *Pending execution* |
 | **5** | **Lifecycle Management** | Sequence: `Running` $\rightarrow$ `Stopped` $\rightarrow$ `Started` $\rightarrow$ `Removed` | **Pending** | *Pending execution* |
 
@@ -71,3 +71,69 @@ rabbitmq:3-management   e582c0bc7766        392MB          118MB    U
 The official image `nginx:latest` (Image ID `165ddde8751e`) is successfully downloaded and registered in the local Docker image store:
 
 ![Docker Images Local Cache Output](screenshots/01_docker_images_nginx.png)
+
+---
+
+## Task 2: Run the Web Server
+
+### 2.1 Objective
+Instantiate an Nginx container named `training-web` in detached background mode, map host port `8080` to container port `80`, and verify that the default web application is accessible via browser and HTTP clients.
+
+### 2.2 Theoretical Principles Applied
+* **Detached Execution (`-d`):** Unlike foreground attached mode which binds the current terminal to standard I/O streams and stops the container upon `Ctrl + C`, detached mode tells the Docker Daemon to run the container process in the background and immediately output the container ID.
+* **Deterministic Container Naming (`--name`):** By default, Docker assigns random memorable names (`adoring_turing`). Assigning `--name training-web` ensures reliable addressing for logging, inspection, execution, and lifecycle commands.
+* **Network Bridging & Port Mapping (`-p <host-port>:<container-port>`):** Docker containers exist inside isolated network namespaces with private IP addresses unreachable directly from outside the host. Port mapping configures NAT forwarding rules in the Docker bridge network, bridging incoming host traffic on port `8080` to the internal Nginx daemon listening on port `80`.
+
+### 2.3 Executed Commands & Outputs
+
+#### Step 1: Start the container in detached mode with port mapping
+```bash
+docker run -d --name training-web -p 8080:80 nginx
+```
+
+**Terminal Output:**
+```text
+f4b13f04ac5dcb1c9efc719880235c7adb1ea6006408f5636f198c6740b03e93
+```
+
+#### Step 2: Verify active container status
+```bash
+docker ps
+```
+
+**Terminal Output:**
+```text
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                     NAMES
+f4b13f04ac5d   nginx     "/docker-entrypoint.…"   14 seconds ago   Up 13 seconds   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   training-web
+```
+
+#### Step 3: Verify HTTP connectivity and response headers
+```bash
+curl -I http://localhost:8080
+```
+
+**Terminal Output:**
+```text
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Mon, 16 Nov 2026 06:52:49 GMT
+Content-Type: text/html
+Content-Length: 896
+Last-Modified: Wed, 21 Oct 2026 14:24:51 GMT
+Connection: keep-alive
+ETag: "6ad8cb33-380"
+Accept-Ranges: bytes
+```
+
+### 2.4 Visual Evidence Deliverables
+
+#### Evidence 2A: Active Running Container Status
+The terminal execution of `docker ps` verifies that `training-web` is running in detached mode with active port forwarding (`0.0.0.0:8080->80/tcp`):
+
+![Running Container Status](screenshots/02_docker_ps_running.png)
+
+#### Evidence 2B: Application Access from Web Browser
+Opening `http://localhost:8080` in the browser renders the default **"Welcome to nginx!"** landing page, proving successful end-to-end host-to-container network routing:
+
+![Nginx Default Welcome Page in Browser](screenshots/03_nginx_browser_access.png)
+
