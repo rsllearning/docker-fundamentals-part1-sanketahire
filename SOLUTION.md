@@ -16,8 +16,8 @@ This report documents the step-by-step practical execution, verification, and an
 | **1** | **Obtain the Docker Image** | Search, pull, and verify official `nginx:latest` | **Completed** | [01_docker_images_nginx.png](screenshots/01_docker_images_nginx.png) |
 | **2** | **Run the Web Server** | Run `training-web` detached with port forwarding | **Completed** | [02_docker_ps_running.png](screenshots/02_docker_ps_running.png), [03_nginx_browser_access.png](screenshots/03_nginx_browser_access.png) |
 | **3** | **Runtime Configuration** | Inject environment variables (`APP_ENV=development`) | **Completed** | [04_env_variable_verification.png](screenshots/04_env_variable_verification.png) |
-| **4** | **Explore Container** | Inspect logs, in-container exec, and 5 metadata fields | **In Progress** | *To be captured upon execution* |
-| **5** | **Lifecycle Management** | Sequence: `Running` $\rightarrow$ `Stopped` $\rightarrow$ `Started` $\rightarrow$ `Removed` | **Pending** | *Pending execution* |
+| **4** | **Explore Container** | Inspect logs, in-container exec, and 5 metadata fields | **Completed** | [05_docker_logs.png](screenshots/05_docker_logs.png),<br>[06a_docker_inspect_overview.png](screenshots/06a_docker_inspect_overview.png),<br>[06b_docker_inspect_hostconfig.png](screenshots/06b_docker_inspect_hostconfig.png),<br>[06c_docker_inspect_env_config.png](screenshots/06c_docker_inspect_env_config.png),<br>[06d_docker_inspect_network_format.png](screenshots/06d_docker_inspect_network_format.png) |
+| **5** | **Lifecycle Management** | Sequence: `Running` $\rightarrow$ `Stopped` $\rightarrow$ `Started` $\rightarrow$ `Removed` | **In Progress** | *To be captured upon execution* |
 
 ---
 
@@ -200,5 +200,101 @@ docker stop training-web-env && docker rm training-web-env
 The terminal execution below confirms that `APP_ENV=development` was successfully passed and is actively accessible inside the container environment:
 
 ![In-Container Environment Variable Verification](screenshots/04_env_variable_verification.png)
+
+---
+
+## Task 4: Explore the Running Container
+
+### 4.1 Objective
+Perform deep container observability and administrative inspection on the running `training-web` container:
+1. Examine container logs.
+2. Verify active process status.
+3. Execute an administrative command inside the live container without interrupting web traffic.
+4. Extract and document the 5 mandatory metadata attributes: Container ID, Image Used, Port Mapping, Environment Variables, and Assigned Bridge IP Address.
+
+### 4.2 Theoretical Principles Applied
+* **Standard Output Logging (`docker logs`):** In modern container architecture, applications write diagnostic and access logs to `stdout` and `stderr`. Docker's logging driver intercepts these streams, enabling non-invasive log aggregation and real-time monitoring (`-f`, `--tail`).
+* **Non-Disruptive Process Execution (`docker exec`):** While `docker run` instantiates a brand new container, `docker exec` attaches an auxiliary process to the existing Linux namespaces (PID, mount, network) of a running container, allowing runtime troubleshooting without restarting or altering PID 1.
+* **Declarative Metadata Architecture (`docker inspect`):** Docker persists container state as a unified JSON document. Utilizing Go template syntax (`--format '{{ ... }}'`) allows precise, programmatic extraction of nested attributes (e.g., network settings and ports) without parsing large raw text outputs.
+
+### 4.3 Executed Commands & Outputs
+
+#### Step 1: View container logs
+```bash
+docker logs training-web
+```
+
+**Terminal Output:**
+```text
+/docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+/docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+/docker-entrypoint.sh: Configuration complete; ready for start up
+2026/11/16 06:52:11 [notice] 1#1: nginx/1.31.8
+2026/11/16 06:52:11 [notice] 1#1: start worker processes
+192.168.65.1 - - [16/Nov/2026:06:52:49 +0000] "HEAD / HTTP/1.1" 200 0 "-" "curl/8.7.1" "-"
+192.168.65.1 - - [16/Nov/2026:06:53:57 +0000] "GET / HTTP/1.1" 200 896 "-" "Mozilla/5.0 ... Chrome/..."
+192.168.65.1 - - [16/Nov/2026:06:54:01 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 ... Chrome/..."
+```
+
+#### Step 2: Check current container status
+```bash
+docker ps
+```
+
+**Terminal Output:**
+```text
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                     NAMES
+f4b13f04ac5d   nginx     "/docker-entrypoint.…"   25 minutes ago   Up 25 minutes   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   training-web
+```
+
+#### Step 3: Execute an in-container filesystem command
+```bash
+docker exec training-web ls -la /usr/share/nginx/html
+```
+
+**Terminal Output:**
+```text
+total 16
+drwxr-xr-x 2 root root 4096 Nov  5 07:17 .
+drwxr-xr-x 3 root root 4096 Nov  5 07:17 ..
+-rw-r--r-- 1 root root  497 Oct 21 14:24 50x.html
+-rw-r--r-- 1 root root  896 Oct 21 14:24 index.html
+```
+
+#### Step 4: Extract and identify the 5 mandatory metadata attributes
+Using targeted Go template formatting on `docker inspect training-web`:
+
+```bash
+docker inspect --format 'ID: {{.Id}} | Image: {{.Config.Image}} | IP: {{.NetworkSettings.Networks.bridge.IPAddress}} | Ports: {{json .NetworkSettings.Ports}}' training-web
+```
+
+**Extracted Attributes Summary:**
+
+| # | Attribute | Extraction Template | Identified Value |
+| :-: | :--- | :--- | :--- |
+| **1** | **Container ID** | `{{ .Id }}` | `f4b13f04ac5dcb1c9efc719880235c7adb1ea6006408f5636f198c6740b03e93` (short: `f4b13f04ac5d`) |
+| **2** | **Image Used** | `{{ .Config.Image }}` | `nginx` (digest: `sha256:165ddde8751e...`) |
+| **3** | **Port Mapping** | `{{ json .NetworkSettings.Ports }}` | `80/tcp` $\rightarrow$ `0.0.0.0:8080`, `[::]:8080` |
+| **4** | **Environment Variables** | `{{ json .Config.Env }}` | `["PATH=...","NGINX_VERSION=1.31.8","NJS_VERSION=1.0.2","ACME_VERSION=0.4.1",...]` |
+| **5** | **Container IP Address** | `{{ .NetworkSettings.Networks.bridge.IPAddress }}` | `172.17.0.2` (Default bridge network) |
+
+### 4.4 Visual Evidence Deliverables
+
+#### Evidence 4A: Container Logs Output
+The terminal output demonstrates log capture through `docker logs training-web`, showing both daemon startup and live incoming HTTP GET/HEAD requests:
+
+![Container Logs Output](screenshots/05_docker_logs.png)
+
+#### Evidence 4B: Targeted Container Inspection & Extracted Properties
+The terminal capture below shows both the NetworkSettings structure and the concise `--format` template output confirming the 5 extracted metadata properties:
+
+![Container Inspection Output](screenshots/06d_docker_inspect_network_format.png)
+
+*(Additional reference inspect captures documenting full JSON sections: [Overview](screenshots/06a_docker_inspect_overview.png), [HostConfig](screenshots/06b_docker_inspect_hostconfig.png), [EnvConfig](screenshots/06c_docker_inspect_env_config.png)).*
+
+
+
 
 
