@@ -2,6 +2,8 @@
 
 This repository contains the practical implementation and documentation for **Docker Fundamentals (Part 1)**. The objective of this training assignment is to establish hands-on proficiency in containerization concepts and Docker CLI operations for day-to-day software development.
 
+> 💡 **Assignment Submission Report:** For the complete step-by-step walkthrough, theoretical principles, command-output pairings, and evidence deliverables, please refer directly to [SOLUTION.md](SOLUTION.md).
+
 ---
 
 ## Overview
@@ -47,7 +49,7 @@ Modern software development requires consistent, reproducible, and isolated runt
 │   ├── Training.Material.Docker.Part1.pdf
 │   └── Training.Assignment.Docker.Part1.pdf
 ├── screenshots/                        # Visual verification deliverables for all tasks
-└── SOLUTION.md                         # (To be added on feature branch) Comprehensive submission report
+└── SOLUTION.md                         # Comprehensive assignment submission report and verification logs
 ```
 
 ---

@@ -17,7 +17,7 @@ This report documents the step-by-step practical execution, verification, and an
 | **2** | **Run the Web Server** | Run `training-web` detached with port forwarding | **Completed** | [02_docker_ps_running.png](screenshots/02_docker_ps_running.png), [03_nginx_browser_access.png](screenshots/03_nginx_browser_access.png) |
 | **3** | **Runtime Configuration** | Inject environment variables (`APP_ENV=development`) | **Completed** | [04_env_variable_verification.png](screenshots/04_env_variable_verification.png) |
 | **4** | **Explore Container** | Inspect logs, in-container exec, and 5 metadata fields | **Completed** | [05_docker_logs.png](screenshots/05_docker_logs.png),<br>[06a_docker_inspect_overview.png](screenshots/06a_docker_inspect_overview.png),<br>[06b_docker_inspect_hostconfig.png](screenshots/06b_docker_inspect_hostconfig.png),<br>[06c_docker_inspect_env_config.png](screenshots/06c_docker_inspect_env_config.png),<br>[06d_docker_inspect_network_format.png](screenshots/06d_docker_inspect_network_format.png) |
-| **5** | **Lifecycle Management** | Sequence: `Running` $\rightarrow$ `Stopped` $\rightarrow$ `Started` $\rightarrow$ `Removed` | **In Progress** | *To be captured upon execution* |
+| **5** | **Lifecycle Management** | Sequence: `Running` $\rightarrow$ `Stopped` $\rightarrow$ `Started` $\rightarrow$ `Removed` | **Completed** | [07_container_lifecycle_states.png](screenshots/07_container_lifecycle_states.png) |
 
 ---
 
@@ -293,6 +293,123 @@ The terminal capture below shows both the NetworkSettings structure and the conc
 ![Container Inspection Output](screenshots/06d_docker_inspect_network_format.png)
 
 *(Additional reference inspect captures documenting full JSON sections: [Overview](screenshots/06a_docker_inspect_overview.png), [HostConfig](screenshots/06b_docker_inspect_hostconfig.png), [EnvConfig](screenshots/06c_docker_inspect_env_config.png)).*
+
+---
+
+## Task 5: Container Lifecycle Management
+
+### 5.1 Objective
+Methodically manage and document the complete container lifecycle of `training-web`:
+1. Stop the running container and verify the `Exited` status.
+2. Re-start the existing container and verify that web traffic resumes without issue.
+3. Stop and permanently remove the container.
+4. Verify complete non-existence in Docker's process table.
+
+### 5.2 Theoretical Principles Applied
+* **Graceful Termination vs. Force Termination (`docker stop` vs. `docker rm -f`):** Executing `docker stop` sends a `SIGTERM` signal to the container's primary process (PID 1), allowing it to finish in-flight requests and cleanly close file descriptors before Docker sends a `SIGKILL`. Force removal (`docker rm -f`) terminates the process abruptly. Best practices dictate graceful stoppage before removal.
+* **State Persistence in Stopped (`Exited`) Containers:** When a container stops, its process ceases execution, but its dedicated **Writable Layer** and assigned configuration remain completely preserved on disk. It can be re-activated at any time via `docker start` with its network configuration and file changes intact.
+* **Permanent Destruction (`docker rm`):** The `docker rm` command permanently deletes the container's writable layer and deregisters its metadata from the daemon. A removed container cannot be started again; it must be recreated from its base image.
+* **The Lifecycle State Flow:**
+  $$\text{Created} \longrightarrow \text{Running} \longrightarrow \text{Exited (Stopped)} \longrightarrow \text{Running (Started)} \longrightarrow \text{Removed}$$
+
+### 5.3 Executed Commands & Outputs
+
+#### Step 1: Stop the running container
+```bash
+docker stop training-web
+```
+
+**Terminal Output:**
+```text
+training-web
+```
+
+#### Step 2: Verify container is in Exited state
+```bash
+docker ps -a
+```
+
+**Terminal Output:**
+```text
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS                    PORTS     NAMES
+f4b13f04ac5d   nginx     "/docker-entrypoint.…"   32 minutes ago   Exited (0) 6 seconds ago             training-web
+```
+
+#### Step 3: Start the stopped container again
+```bash
+docker start training-web
+```
+
+**Terminal Output:**
+```text
+training-web
+```
+
+#### Step 4: Verify container resumed running state
+```bash
+docker ps
+```
+
+**Terminal Output:**
+```text
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS         PORTS                                     NAMES
+f4b13f04ac5d   nginx     "/docker-entrypoint.…"   32 minutes ago   Up 5 seconds   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   training-web
+```
+
+#### Step 5: Stop and permanently remove the container
+```bash
+docker stop training-web
+docker rm training-web
+```
+
+**Terminal Output:**
+```text
+training-web
+training-web
+```
+
+#### Step 6: Verify complete non-existence in process table
+```bash
+docker ps -a
+```
+
+**Terminal Output:**
+```text
+CONTAINER ID   IMAGE                   COMMAND                  CREATED       STATUS                        PORTS     NAMES
+21adb83c911a   rabbitmq:3-management   "docker-entrypoint.s…"   11 days ago   Exited (255) 57 minutes ago             rabbitmq
+88262e69a4c3   apache/kafka:latest     "/__cacert_entrypoin…"   12 days ago   Exited (143) 11 days ago                kafka-broker
+46af24118e6e   hello-world             "/hello"                 12 days ago   Exited (0) 12 days ago                  hopeful_feynman
+```
+*(Notice: `training-web` is completely absent from all active and stopped container records).*
+
+### 5.4 Visual Evidence Deliverable
+The terminal execution below captures the continuous sequence demonstrating all four states: **Running $\rightarrow$ Stopped (`Exited`) $\rightarrow$ Started (`Up`) $\rightarrow$ Removed**:
+
+![Container Lifecycle States](screenshots/07_container_lifecycle_states.png)
+
+---
+
+## 6. Comprehensive Docker Command Reference
+
+To satisfy the **Deliverables: Docker Commands** requirement of the assignment, the table below provides a consolidated summary of all commands utilized across the five tasks:
+
+| Operational Category | Exact Command Executed | Purpose & Key Options |
+| :--- | :--- | :--- |
+| **Pulling Image (Task 1)** | `docker pull nginx:latest` | Downloads official image layers from Docker Hub. |
+| **Verifying Image (Task 1)** | `docker images` | Lists cached images, IDs, sizes, and tags. |
+| **Running Container (Task 2)** | `docker run -d --name training-web -p 8080:80 nginx` | `-d`: background mode, `--name`: custom name, `-p`: port mapping host `8080` to container `80`. |
+| **Verifying Service (Task 2)** | `docker ps` | Lists running containers, uptime, and mapped ports. |
+| **Runtime Config (Task 3)** | `docker run -d --name training-web-env -e APP_ENV=development nginx` | `-e`: dynamic environment variable injection at container instantiation. |
+| **Verifying Config (Task 3)** | `docker exec training-web-env printenv APP_ENV` | Reads environment variable inside live container. |
+| **Viewing Logs (Task 4)** | `docker logs training-web` | Displays `stdout`/`stderr` startup and HTTP request logs. |
+| **In-Container Exec (Task 4)**| `docker exec training-web ls -la /usr/share/nginx/html` | Executes non-intrusive command in live container namespace. |
+| **Inspecting Container (Task 4)**| `docker inspect training-web` | Queries complete container configuration and state JSON. |
+| **Targeted Inspection (Task 4)**| `docker inspect --format '...' training-web` | Uses Go templates to isolate ID, Image, IP, and Ports. |
+| **Stopping Container (Task 5)**| `docker stop training-web` | Gracefully stops the container with `SIGTERM`. |
+| **Verifying Stopped (Task 5)**| `docker ps -a` | Lists all containers including `Exited` status. |
+| **Starting Container (Task 5)**| `docker start training-web` | Re-spawns existing container retaining writable layer. |
+| **Removing Container (Task 5)**| `docker rm training-web` | Permanently deletes container and writable layer. |
+
 
 
 
